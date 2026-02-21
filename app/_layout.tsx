@@ -6,12 +6,14 @@ import {
 } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { useURL } from 'expo-linking';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
+import { useGatewayActions } from '@/hooks/useGateway';
 import { ThemeProvider, useTheme } from '@/theme';
+import { AppKeys, appGetBoolean } from '@/utils/app-storage';
 import { parseOpenClawUrl } from '@/utils/deep-link';
 
 export { ErrorBoundary } from 'expo-router';
@@ -32,12 +34,6 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
   if (!loaded) {
     return null;
   }
@@ -52,16 +48,41 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const { colors, isDark } = useTheme();
   const url = useURL();
+  const { reconnectFromSaved } = useGatewayActions();
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
 
+  // Onboarding tekshiruvi va SplashScreen boshqaruvi
   useEffect(() => {
-    if (url) {
-      const parsed = parseOpenClawUrl(url);
-      if (parsed) {
-        // To'liq navigatsiya task 009 (onboarding-flow) da implementatsiya qilinadi
-        console.log('Deep link received:', parsed.type);
-      }
+    const onboardingComplete = appGetBoolean(AppKeys.ONBOARDING_COMPLETE);
+
+    if (onboardingComplete) {
+      reconnectFromSaved();
+    } else {
+      router.replace('/onboarding');
     }
-  }, [url]);
+
+    setIsNavigationReady(true);
+    SplashScreen.hideAsync();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deep link handling
+  useEffect(() => {
+    if (!url || !isNavigationReady) return;
+
+    const parsed = parseOpenClawUrl(url);
+    if (parsed && (parsed.type === 'connect' || parsed.type === 'pair')) {
+      router.push({
+        pathname: '/onboarding/manual-setup',
+        params: {
+          host: parsed.config.host,
+          port: String(parsed.config.port),
+          token: parsed.config.token ?? '',
+          useTLS: parsed.config.useTLS ? '1' : '0',
+          autoConnect: '1',
+        },
+      });
+    }
+  }, [url, isNavigationReady]);
 
   const navigationTheme = isDark
     ? {
@@ -93,7 +114,10 @@ function RootLayoutNav() {
     <NavigationThemeProvider value={navigationTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
         <Stack.Screen name="chat/[sessionKey]" options={{ headerShown: true, title: 'Chat' }} />
       </Stack>
     </NavigationThemeProvider>

@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useGatewayStore } from '@/stores/gateway-store';
 import { useTheme } from '@/theme';
 import { parseOpenClawUrl } from '@/utils/deep-link';
+import { completeOnboarding } from '@/utils/onboarding';
 
 const OVERLAY_COLOR = 'rgba(0, 0, 0, 0.6)';
 const FRAME_SIZE = 250;
@@ -22,18 +24,45 @@ export default function ScanQRScreen() {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [error, setError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const processingRef = useRef(false);
+  const connect = useGatewayStore((s) => s.connect);
 
   const handleBarcodeScanned = useCallback(
-    ({ data }: { data: string }) => {
+    async ({ data }: { data: string }) => {
       if (processingRef.current) return;
       processingRef.current = true;
 
       const parsed = parseOpenClawUrl(data);
       if (parsed) {
         Vibration.vibrate(100);
-        // Task 009 da to'liq navigatsiya implementatsiya qilinadi
-        router.back();
+
+        if (parsed.type === 'connect' || parsed.type === 'pair') {
+          setIsConnecting(true);
+          try {
+            await connect(parsed.config);
+            completeOnboarding();
+            return;
+          } catch {
+            // Xatoda manual-setup ga yo'naltirish (params bilan)
+            router.replace({
+              pathname: '/onboarding/manual-setup',
+              params: {
+                host: parsed.config.host,
+                port: String(parsed.config.port),
+                token: parsed.config.token ?? '',
+                useTLS: parsed.config.useTLS ? '1' : '0',
+              },
+            });
+            return;
+          } finally {
+            setIsConnecting(false);
+            processingRef.current = false;
+          }
+        }
+
+        // relay yoki boshqa turlar uchun hozircha manual-setup ga yo'naltirish
+        processingRef.current = false;
       } else {
         setError("Noto'g'ri QR kod");
         setTimeout(() => {
@@ -42,7 +71,7 @@ export default function ScanQRScreen() {
         }, 2000);
       }
     },
-    [],
+    [connect],
   );
 
   if (!permission) {
@@ -95,6 +124,14 @@ export default function ScanQRScreen() {
         <View style={styles.overlayBottom} />
       </View>
 
+      {/* Connecting overlay */}
+      {isConnecting && (
+        <View style={styles.connectingOverlay}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.connectingText}>Ulanilmoqda...</Text>
+        </View>
+      )}
+
       {/* Error toast */}
       {error && (
         <View style={[styles.toast, { backgroundColor: colors.error }]}>
@@ -113,10 +150,7 @@ export default function ScanQRScreen() {
       {/* Manual entry */}
       <Pressable
         style={[styles.manualButton, { bottom: insets.bottom + 32 }]}
-        onPress={() => {
-          // Task 009 da manual entry ekrani qo'shiladi
-          router.back();
-        }}
+        onPress={() => router.push('/onboarding/manual-setup')}
       >
         <Text style={[styles.manualButtonText, { color: colors.primary }]}>
           Manual kiritish
@@ -139,6 +173,18 @@ const styles = StyleSheet.create({
   overlaySide: { flex: 1, backgroundColor: OVERLAY_COLOR },
   frame: { width: FRAME_SIZE, height: FRAME_SIZE, borderWidth: 2, borderRadius: 12 },
   overlayBottom: { flex: 1, backgroundColor: OVERLAY_COLOR },
+  connectingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  connectingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   toast: {
     position: 'absolute',
     top: 100,
