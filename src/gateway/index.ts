@@ -6,3 +6,8 @@ export {
   scanGateways,
   type DiscoveredGateway,
 } from './discovery';
+export {
+  calculateDelay,
+  DEFAULT_RECONNECT_CONFIG,
+  type ReconnectConfig,
+} from './reconnect';

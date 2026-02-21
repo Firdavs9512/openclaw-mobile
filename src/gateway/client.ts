@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { Platform } from 'react-native';
+import { AppState, type AppStateStatus, Platform } from 'react-native';
 
 import type {
   ConnectionState,
@@ -16,6 +16,11 @@ import { ensureDeviceIdentity, signChallenge } from '@/utils/crypto';
 import { secureSet } from '@/utils/secure-storage';
 
 import { GatewayError } from './errors';
+import {
+  calculateDelay,
+  DEFAULT_RECONNECT_CONFIG,
+  type ReconnectConfig,
+} from './reconnect';
 import { buildGatewayUrl, generateUUID } from './utils';
 
 interface PendingRequest {
@@ -33,6 +38,30 @@ export class GatewayClient extends EventEmitter {
   private deviceIdentity: DeviceIdentity | null = null;
   private _state: ConnectionState = 'disconnected';
 
+  // Reconnect
+  private reconnectConfig: ReconnectConfig;
+  private reconnectAttempt: number = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private shouldReconnect: boolean = false;
+
+  // Health monitor
+  private healthTimer: ReturnType<typeof setInterval> | null = null;
+  private lastTickAt: number = 0;
+  private tickIntervalMs: number = 15000;
+
+  // AppState
+  private appStateSubscription: ReturnType<
+    typeof AppState.addEventListener
+  > | null = null;
+
+  constructor(reconnectConfig?: Partial<ReconnectConfig>) {
+    super();
+    this.reconnectConfig = {
+      ...DEFAULT_RECONNECT_CONFIG,
+      ...reconnectConfig,
+    };
+  }
+
   get state(): ConnectionState {
     return this._state;
   }
@@ -43,7 +72,11 @@ export class GatewayClient extends EventEmitter {
 
   async connect(config: GatewayConfig): Promise<void> {
     if (this.ws) {
-      this.disconnect();
+      // Close existing WS without triggering full disconnect logic
+      // (which would clear shouldReconnect during reconnect cycles)
+      const oldWs = this.ws;
+      this.ws = null;
+      oldWs.close();
     }
 
     this.config = config;
@@ -103,6 +136,19 @@ export class GatewayClient extends EventEmitter {
       await secureSet('device_token', helloOk.auth.deviceToken);
     }
 
+    this.tickIntervalMs = helloOk.policy.tickIntervalMs;
+    this.reconnectAttempt = 0;
+    this.shouldReconnect = true;
+
+    this.removeListener('tick', this.onTick);
+    this.on('tick', this.onTick);
+
+    this.startHealthMonitor();
+
+    if (!this.appStateSubscription) {
+      this.setupAppStateListener();
+    }
+
     this.setState('connected');
   }
 
@@ -154,6 +200,16 @@ export class GatewayClient extends EventEmitter {
   }
 
   disconnect(): void {
+    this.shouldReconnect = false;
+    this.stopReconnectTimer();
+    this.stopHealthMonitor();
+    this.removeListener('tick', this.onTick);
+
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+
     const ws = this.ws;
     this.ws = null;
 
@@ -168,6 +224,22 @@ export class GatewayClient extends EventEmitter {
       pending.reject(new GatewayError('DISCONNECTED', 'Client disconnected'));
     }
     this.pendingRequests.clear();
+  }
+
+  stopReconnect(): void {
+    this.shouldReconnect = false;
+    this.stopReconnectTimer();
+    this.stopHealthMonitor();
+    this.removeListener('tick', this.onTick);
+
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+
+    if (this._state === 'reconnecting') {
+      this.setState('disconnected');
+    }
   }
 
   // === PRIVATE ===
@@ -203,8 +275,10 @@ export class GatewayClient extends EventEmitter {
         this.handleFrame(String(event.data));
       });
 
-      ws.addEventListener('close', () => {
-        this.handleClose();
+      ws.addEventListener('close', (event) => {
+        // Ignore close events from stale WS instances (replaced by connect())
+        if (this.ws !== ws) return;
+        this.onClose(event as unknown as { code: number; reason: string });
       });
 
       this.ws = ws;
@@ -282,7 +356,7 @@ export class GatewayClient extends EventEmitter {
     this.emit('event', frame);
   }
 
-  private handleClose(): void {
+  private onClose(_event: { code: number; reason: string }): void {
     for (const [, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);
       pending.reject(
@@ -291,9 +365,102 @@ export class GatewayClient extends EventEmitter {
     }
     this.pendingRequests.clear();
 
-    if (this._state !== 'disconnected') {
+    this.stopHealthMonitor();
+    this.removeListener('tick', this.onTick);
+
+    if (this.shouldReconnect) {
+      this.setState('reconnecting');
+      this.scheduleReconnect();
+    } else if (this._state !== 'disconnected') {
       this.setState('disconnected');
     }
+  }
+
+  private scheduleReconnect(): void {
+    this.stopReconnectTimer();
+
+    if (!this.config) {
+      this.setState('disconnected');
+      return;
+    }
+
+    const delay = calculateDelay(this.reconnectAttempt, this.reconnectConfig);
+
+    this.emit('reconnect:scheduled', {
+      attempt: this.reconnectAttempt,
+      delay,
+    });
+
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      this.reconnectAttempt++;
+
+      try {
+        await this.connect(this.config!);
+        this.reconnectAttempt = 0;
+        this.emit('reconnect:success');
+      } catch (error) {
+        if (error instanceof GatewayError && error.isAuthError) {
+          this.shouldReconnect = false;
+          this.setState('disconnected');
+          this.emit('reconnect:auth_error', error);
+        } else if (this.shouldReconnect) {
+          this.setState('reconnecting');
+          this.scheduleReconnect();
+        }
+      }
+    }, delay);
+  }
+
+  private stopReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
+  private startHealthMonitor(): void {
+    this.stopHealthMonitor();
+    this.lastTickAt = Date.now();
+
+    this.healthTimer = setInterval(() => {
+      const elapsed = Date.now() - this.lastTickAt;
+      if (elapsed > this.tickIntervalMs * 2.5) {
+        this.emit('health:stale');
+        if (this.ws) {
+          this.ws.close();
+        }
+      }
+    }, this.tickIntervalMs);
+  }
+
+  private stopHealthMonitor(): void {
+    if (this.healthTimer) {
+      clearInterval(this.healthTimer);
+      this.healthTimer = null;
+    }
+  }
+
+  private readonly onTick = (): void => {
+    this.lastTickAt = Date.now();
+  };
+
+  private setupAppStateListener(): void {
+    this.appStateSubscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        if (nextState === 'active' && this.shouldReconnect && this.config) {
+          if (
+            this._state === 'reconnecting' ||
+            this._state === 'disconnected'
+          ) {
+            this.reconnectAttempt = 0;
+            this.stopReconnectTimer();
+            this.scheduleReconnect();
+          }
+        }
+      },
+    );
   }
 
   private setState(state: ConnectionState): void {
