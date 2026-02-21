@@ -1,11 +1,11 @@
 import { StyleSheet } from 'react-native';
 import { Text, View } from '@/components/common/Themed';
 
-export default function ChatTabScreen() {
+export default function SettingsScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>OpenClaw Chat</Text>
-      <Text style={styles.subtitle}>Gateway ga ulanish kutilmoqda...</Text>
+      <Text style={styles.title}>Settings</Text>
+      <Text style={styles.subtitle}>{'Sozlamalar bu yerda bo\'ladi'}</Text>
     </View>
   );
 }
