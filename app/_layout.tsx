@@ -5,12 +5,14 @@ import {
   ThemeProvider as NavigationThemeProvider,
 } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
+import { useURL } from 'expo-linking';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { ThemeProvider, useTheme } from '@/theme';
+import { parseOpenClawUrl } from '@/utils/deep-link';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -49,6 +51,17 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const { colors, isDark } = useTheme();
+  const url = useURL();
+
+  useEffect(() => {
+    if (url) {
+      const parsed = parseOpenClawUrl(url);
+      if (parsed) {
+        // To'liq navigatsiya task 009 (onboarding-flow) da implementatsiya qilinadi
+        console.log('Deep link received:', parsed.type);
+      }
+    }
+  }, [url]);
 
   const navigationTheme = isDark
     ? {

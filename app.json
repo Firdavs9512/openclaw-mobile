@@ -15,7 +15,11 @@
     },
     "ios": {
       "bundleIdentifier": "com.openclaw.mobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSBonjourServices": ["_openclaw-gw._tcp"],
+        "NSLocalNetworkUsageDescription": "OpenClaw tarmoqdagi gateway serverlarni topish uchun local tarmoqqa kirish kerak."
+      }
     },
     "android": {
       "package": "com.openclaw.mobile",
@@ -23,7 +27,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1A1A2E"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +40,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "QR kod skanerlash uchun kamera ruxsati kerak.",
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
