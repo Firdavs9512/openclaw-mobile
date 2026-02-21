@@ -10,12 +10,18 @@
     "lint": "expo lint",
     "format": "prettier --write \"**/*.{ts,tsx,json}\"",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "test:mock-server": "bun run __tests__/mock-gateway/server.ts",
+    "test:integration": "jest --runInBand __tests__/integration/"
   },
   "jest": {
     "preset": "jest-expo",
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|react-navigation|@react-navigation/.*|@noble/.*)"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "__tests__/mock-gateway/"
     ]
   },
   "dependencies": {
@@ -48,12 +54,14 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
+    "@types/ws": "^8.18.1",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~10.0.0",
     "jest-expo": "^54.0.17",
     "prettier": "^3.8.1",
     "react-test-renderer": "19.1.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "ws": "^8.19.0"
   },
   "private": true
 }
