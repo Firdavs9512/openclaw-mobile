@@ -1,0 +1,112 @@
+import React, { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { useTheme } from '@/theme';
+import type { StreamingMessage } from '@/types/chat';
+
+interface StreamingTextProps {
+  message: StreamingMessage;
+}
+
+export const StreamingText = React.memo(function StreamingText({
+  message,
+}: StreamingTextProps) {
+  const { colors } = useTheme();
+  const cursorOpacity = useSharedValue(1);
+
+  useEffect(() => {
+    if (message.isStreaming) {
+      cursorOpacity.value = withRepeat(
+        withTiming(0, { duration: 530, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      );
+    } else {
+      cursorOpacity.value = withTiming(0, { duration: 200 });
+    }
+  }, [message.isStreaming, cursorOpacity]);
+
+  const cursorStyle = useAnimatedStyle(() => ({
+    opacity: cursorOpacity.value,
+  }));
+
+  return (
+    <View
+      style={[
+        styles.wrapper,
+        { alignItems: 'flex-start' },
+      ]}
+    >
+      <View
+        style={[styles.bubble, { backgroundColor: colors.assistantBubble }]}
+      >
+        {(message.isThinking || message.toolName) && (
+          <View style={styles.indicator}>
+            <ActivityIndicator size="small" color={colors.textTertiary} />
+            <Text style={[styles.indicatorText, { color: colors.textTertiary }]}>
+              {message.toolName
+                ? `${message.toolName} ishlatilmoqda...`
+                : "O'ylayapti..."}
+            </Text>
+          </View>
+        )}
+        <View style={styles.contentRow}>
+          <Text
+            style={[styles.content, { color: colors.assistantBubbleText }]}
+          >
+            {message.content}
+          </Text>
+          {message.isStreaming && (
+            <Animated.View style={cursorStyle}>
+              <Text style={[styles.cursor, { color: colors.primary }]}>
+                |
+              </Text>
+            </Animated.View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  wrapper: {
+    marginVertical: 4,
+    marginHorizontal: 12,
+  },
+  bubble: {
+    maxWidth: '80%',
+    borderRadius: 16,
+    padding: 12,
+  },
+  indicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  indicatorText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  contentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+  },
+  content: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  cursor: {
+    fontSize: 18,
+    fontWeight: '300',
+    lineHeight: 22,
+  },
+});
