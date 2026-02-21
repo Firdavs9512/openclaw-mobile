@@ -73,6 +73,11 @@ export const useGatewayStore = create<GatewayStore>((set, get) => {
         await client.connect(config);
         const url = buildGatewayUrl(config);
         set({ gatewayUrl: url });
+
+        const { setupAgentEventListener } = await import(
+          '@/stores/chat-store'
+        );
+        setupAgentEventListener();
       } catch (error) {
         if (error instanceof GatewayError) {
           set({ error });
