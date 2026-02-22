@@ -119,12 +119,14 @@ export default function ManualSetupScreen() {
       await connect(config);
       completeOnboarding();
     } catch (err) {
+      console.error('[ManualSetup] connect error:', err);
       if (err instanceof GatewayError && err.code === 'NOT_PAIRED') {
         setPairingConfig(config);
       } else if (err instanceof GatewayError) {
         setConnectError(getErrorMessage(err));
       } else {
-        setConnectError("Kutilmagan xato yuz berdi");
+        const msg = err instanceof Error ? err.message : String(err);
+        setConnectError(`Kutilmagan xato: ${msg}`);
       }
     } finally {
       setIsConnecting(false);

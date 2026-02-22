@@ -50,9 +50,9 @@ export default function ChatScreen() {
     }
   }, [sessionKey]);
 
-  // History yuklash
+  // History yuklash (yangi sessiya uchun emas)
   useEffect(() => {
-    if (sessionKey && isConnected) {
+    if (sessionKey && sessionKey !== 'new' && isConnected) {
       useChatStore.getState().loadHistory(sessionKey);
     }
   }, [sessionKey, isConnected]);

@@ -23,6 +23,23 @@ const STATUS_ICONS: Record<MessageStatus, string> = {
   failed: '\u274C',
 };
 
+function extractText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((block) => {
+        if (typeof block === 'string') return block;
+        if (block && typeof block === 'object' && 'text' in block) return String(block.text);
+        return '';
+      })
+      .join('');
+  }
+  if (content && typeof content === 'object' && 'text' in content) {
+    return String((content as { text: string }).text);
+  }
+  return String(content ?? '');
+}
+
 export const MessageBubble = React.memo(function MessageBubble({
   message,
   onRetry,
@@ -32,6 +49,7 @@ export const MessageBubble = React.memo(function MessageBubble({
 
   const bubbleBg = isUser ? colors.userBubble : colors.assistantBubble;
   const textColor = isUser ? colors.userBubbleText : colors.assistantBubbleText;
+  const displayText = extractText(message.content);
 
   return (
     <View
@@ -42,7 +60,7 @@ export const MessageBubble = React.memo(function MessageBubble({
     >
       <View style={[styles.bubble, { backgroundColor: bubbleBg }]}>
         <Text style={[styles.content, { color: textColor }]}>
-          {message.content}
+          {displayText}
         </Text>
         <View style={styles.meta}>
           <Text style={[styles.timestamp, { color: colors.textTertiary }]}>

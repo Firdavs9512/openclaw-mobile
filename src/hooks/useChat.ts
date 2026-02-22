@@ -1,5 +1,8 @@
+import { useShallow } from 'zustand/react/shallow';
 import type { Message, SessionInfo, StreamingMessage } from '@/types/chat';
 import { useChatStore } from '@/stores/chat-store';
+
+const EMPTY_MESSAGES: Message[] = [];
 
 export function useChat() {
   const sendMessage = useChatStore((s) => s.sendMessage);
@@ -9,7 +12,7 @@ export function useChat() {
 }
 
 export function useMessages(sessionKey: string): Message[] {
-  return useChatStore((s) => s.messages[sessionKey] || []);
+  return useChatStore((s) => s.messages[sessionKey] ?? EMPTY_MESSAGES);
 }
 
 export function useStreamingMessage(): StreamingMessage | null {

@@ -31,14 +31,46 @@ export async function loadDeviceIdentity(): Promise<DeviceIdentity | null> {
   return { id: fingerprint, publicKey: publicKeyB64 };
 }
 
-export async function signChallenge(nonce: string): Promise<string> {
+export interface DeviceAuthPayloadParams {
+  deviceId: string;
+  clientId: string;
+  clientMode: string;
+  role: string;
+  scopes: string[];
+  signedAtMs: number;
+  token?: string | null;
+  nonce?: string | null;
+}
+
+function buildDeviceAuthPayload(params: DeviceAuthPayloadParams): string {
+  const version = params.nonce ? 'v2' : 'v1';
+  const scopes = params.scopes.join(',');
+  const token = params.token ?? '';
+  const base = [
+    version,
+    params.deviceId,
+    params.clientId,
+    params.clientMode,
+    params.role,
+    scopes,
+    String(params.signedAtMs),
+    token,
+  ];
+  if (version === 'v2') {
+    base.push(params.nonce ?? '');
+  }
+  return base.join('|');
+}
+
+export async function signDeviceAuth(params: DeviceAuthPayloadParams): Promise<string> {
   const privateKeyB64 = await secureGet('device_private_key');
   if (!privateKeyB64) {
     throw new Error('Device identity not found. Call ensureDeviceIdentity() first.');
   }
 
+  const payload = buildDeviceAuthPayload(params);
   const privateKey = new Uint8Array(Buffer.from(privateKeyB64, 'base64'));
-  const message = new TextEncoder().encode(nonce);
+  const message = new TextEncoder().encode(payload);
   const signature = await ed.signAsync(message, privateKey);
 
   return Buffer.from(signature).toString('base64');

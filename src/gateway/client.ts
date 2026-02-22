@@ -12,7 +12,7 @@ import type {
   HelloOkPayload,
   ResponseFrame,
 } from '@/types/gateway';
-import { ensureDeviceIdentity, signChallenge } from '@/utils/crypto';
+import { ensureDeviceIdentity, signDeviceAuth } from '@/utils/crypto';
 import { secureSet } from '@/utils/secure-storage';
 
 import { GatewayError } from './errors';
@@ -93,25 +93,40 @@ export class GatewayClient extends EventEmitter {
       5000,
     );
 
-    const signature = await signChallenge(challenge.nonce);
+    const clientId = Platform.OS === 'ios' ? 'openclaw-ios' : 'openclaw-android';
+    const clientMode = 'ui';
+    const role = 'operator';
+    const scopes = [
+      'operator.read',
+      'operator.write',
+      'operator.admin',
+      'operator.approvals',
+    ];
+    const signedAt = Date.now();
+
+    const signature = await signDeviceAuth({
+      deviceId: this.deviceIdentity.id,
+      clientId,
+      clientMode,
+      role,
+      scopes,
+      signedAtMs: signedAt,
+      token: config.token ?? null,
+      nonce: challenge.nonce,
+    });
 
     const connectParams: ConnectParams = {
-      minProtocol: 'v3',
-      maxProtocol: 'v3',
+      minProtocol: 3,
+      maxProtocol: 3,
       client: {
-        id: 'openclaw-rn',
+        id: clientId,
         version: '0.1.0',
         platform: Platform.OS,
-        mode: 'operator',
+        mode: clientMode,
         instanceId: this.deviceIdentity.id,
       },
-      role: 'operator',
-      scopes: [
-        'operator.read',
-        'operator.write',
-        'operator.admin',
-        'operator.approvals',
-      ],
+      role,
+      scopes,
       auth: {
         token: config.token,
         password: config.password,
@@ -120,7 +135,7 @@ export class GatewayClient extends EventEmitter {
         id: this.deviceIdentity.id,
         publicKey: this.deviceIdentity.publicKey,
         signature,
-        signedAt: Date.now(),
+        signedAt,
         nonce: challenge.nonce,
       },
       locale: 'en',
