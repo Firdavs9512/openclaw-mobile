@@ -70,14 +70,18 @@ export default function ChatTabScreen() {
     const msgs = [...messages];
 
     if (streamingMessage && streamingMessage.isStreaming) {
-      msgs.push({
-        id: streamingMessage.id,
-        role: 'assistant',
-        content: streamingMessage.content,
-        timestamp: Date.now(),
-        status: 'streaming',
-        sessionKey: sessionKey ?? '',
-      });
+      // Duplikat oldini olish: agar bu id allaqachon messages da bo'lsa, qo'shmaslik
+      const alreadyExists = msgs.some((m) => m.id === streamingMessage.id);
+      if (!alreadyExists) {
+        msgs.push({
+          id: streamingMessage.id,
+          role: 'assistant',
+          content: streamingMessage.content,
+          timestamp: Date.now(),
+          status: 'streaming',
+          sessionKey: sessionKey ?? '',
+        });
+      }
     }
 
     return msgs.reverse();

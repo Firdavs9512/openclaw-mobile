@@ -378,6 +378,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set((state) => {
         // Agar streaming message mavjud bo'lsa va uning ID sidan foydalanish
         const msgId = state.streamingMessage?.id || finalMsg.id;
+        const existing = state.messages[sessionKey] || [];
+        // Duplikat ID bo'lsa, qo'shmaslik
+        if (existing.some((m) => m.id === msgId)) {
+          return {
+            streamingMessage: null,
+            streamingSessionKey: null,
+            isAgentRunning: false,
+            currentRunId: null,
+          };
+        }
         return {
           streamingMessage: null,
           streamingSessionKey: null,
@@ -386,7 +396,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           messages: {
             ...state.messages,
             [sessionKey]: [
-              ...(state.messages[sessionKey] || []),
+              ...existing,
               { ...finalMsg, id: msgId },
             ],
           },
@@ -412,19 +422,31 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sessionKey,
     };
 
-    set((state) => ({
-      streamingMessage: null,
-      streamingSessionKey: null,
-      isAgentRunning: false,
-      currentRunId: null,
-      messages: {
-        ...state.messages,
-        [sessionKey]: [
-          ...(state.messages[sessionKey] || []),
-          finalMsg,
-        ],
-      },
-    }));
+    set((state) => {
+      const existing = state.messages[sessionKey] || [];
+      // Duplikat ID bo'lsa, qo'shmaslik
+      if (existing.some((m) => m.id === finalMsg.id)) {
+        return {
+          streamingMessage: null,
+          streamingSessionKey: null,
+          isAgentRunning: false,
+          currentRunId: null,
+        };
+      }
+      return {
+        streamingMessage: null,
+        streamingSessionKey: null,
+        isAgentRunning: false,
+        currentRunId: null,
+        messages: {
+          ...state.messages,
+          [sessionKey]: [
+            ...existing,
+            finalMsg,
+          ],
+        },
+      };
+    });
   },
 }));
 
