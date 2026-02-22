@@ -7,8 +7,15 @@ export class GatewayError extends Error {
     this.code = code;
   }
 
+  get isPairingRequired(): boolean {
+    return (
+      this.code === 'NOT_PAIRED' ||
+      this.message.toLowerCase().includes('pairing required')
+    );
+  }
+
   get isAuthError(): boolean {
-    return this.code === 'UNAUTHORIZED' || this.code === 'NOT_PAIRED';
+    return this.code === 'UNAUTHORIZED' || this.isPairingRequired;
   }
 
   get isRateLimit(): boolean {

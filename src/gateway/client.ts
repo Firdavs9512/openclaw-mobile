@@ -12,7 +12,7 @@ import type {
   HelloOkPayload,
   ResponseFrame,
 } from '@/types/gateway';
-import { ensureDeviceIdentity, signDeviceAuth } from '@/utils/crypto';
+import { ensureDeviceIdentity, generateDeviceIdentity, signDeviceAuth } from '@/utils/crypto';
 import { secureSet } from '@/utils/secure-storage';
 
 import { GatewayError } from './errors';
@@ -71,9 +71,24 @@ export class GatewayClient extends EventEmitter {
   }
 
   async connect(config: GatewayConfig): Promise<void> {
+    try {
+      await this.attemptConnect(config);
+    } catch (error) {
+      // Device token mismatch — yangi identity yaratib qayta urinish
+      if (
+        error instanceof GatewayError &&
+        error.message.toLowerCase().includes('device token mismatch')
+      ) {
+        await generateDeviceIdentity();
+        await this.attemptConnect(config);
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private async attemptConnect(config: GatewayConfig): Promise<void> {
     if (this.ws) {
-      // Close existing WS without triggering full disconnect logic
-      // (which would clear shouldReconnect during reconnect cycles)
       const oldWs = this.ws;
       this.ws = null;
       oldWs.close();
@@ -372,11 +387,16 @@ export class GatewayClient extends EventEmitter {
   }
 
   private onClose(_event: { code: number; reason: string }): void {
+    // Server may close with reason "pairing required" — propagate as NOT_PAIRED
+    const reason = _event.reason ?? '';
+    const isPairing = reason.toLowerCase().includes('pairing required');
+    const closeError = isPairing
+      ? new GatewayError('NOT_PAIRED', reason)
+      : new GatewayError('DISCONNECTED', 'Connection closed');
+
     for (const [, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);
-      pending.reject(
-        new GatewayError('DISCONNECTED', 'Connection closed'),
-      );
+      pending.reject(closeError);
     }
     this.pendingRequests.clear();
 

@@ -119,8 +119,8 @@ export default function ManualSetupScreen() {
       await connect(config);
       completeOnboarding();
     } catch (err) {
-      console.error('[ManualSetup] connect error:', err);
-      if (err instanceof GatewayError && err.code === 'NOT_PAIRED') {
+      console.warn('[ManualSetup] connect error:', err);
+      if (err instanceof GatewayError && err.isPairingRequired) {
         setPairingConfig(config);
       } else if (err instanceof GatewayError) {
         setConnectError(getErrorMessage(err));

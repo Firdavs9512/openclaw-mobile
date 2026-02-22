@@ -53,11 +53,12 @@ export function PairingDialog({
         cleanup();
         onSuccess();
       } catch (err) {
-        if (err instanceof GatewayError && err.code === 'NOT_PAIRED') {
+        if (err instanceof GatewayError && err.isPairingRequired) {
           // Hali juftlanmagan — davom etamiz
         } else {
-          cleanup();
-          onCancel();
+          // Boshqa xatolarni ham ignore qilamiz — faqat polling davom etadi
+          // Server pairing jarayonida turli xatolar qaytarishi mumkin
+          console.warn('[PairingDialog] retry error:', err instanceof GatewayError ? `${err.code}: ${err.message}` : err);
         }
       }
     }, POLL_INTERVAL);

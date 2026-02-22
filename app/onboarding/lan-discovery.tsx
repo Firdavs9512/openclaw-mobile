@@ -63,7 +63,7 @@ export default function LanDiscoveryScreen() {
       await connect(config);
       completeOnboarding();
     } catch (err) {
-      if (err instanceof GatewayError && err.code === 'NOT_PAIRED') {
+      if (err instanceof GatewayError && err.isPairingRequired) {
         setSelectedGateway(null);
         setPairingConfig(config);
       } else if (err instanceof GatewayError) {
