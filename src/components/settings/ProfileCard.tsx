@@ -2,10 +2,12 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
+import { useAgentName } from '@/hooks/useAgentIdentity';
 import { useTheme } from '@/theme';
 
 export function ProfileCard() {
   const { colors } = useTheme();
+  const agentName = useAgentName();
 
   return (
     <View
@@ -17,7 +19,7 @@ export function ProfileCard() {
       <AssistantAvatar size={56} />
 
       <View style={styles.info}>
-        <Text style={[styles.name, { color: colors.text }]}>Molty</Text>
+        <Text style={[styles.name, { color: colors.text }]}>{agentName}</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Sizning shaxsiy AI yordamchi
         </Text>

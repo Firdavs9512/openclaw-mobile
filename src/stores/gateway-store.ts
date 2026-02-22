@@ -78,6 +78,10 @@ export const useGatewayStore = create<GatewayStore>((set, get) => {
           '@/stores/chat-store'
         );
         setupAgentEventListener();
+
+        // Agent identity olish
+        const { useAgentStore } = await import('@/stores/agent-store');
+        useAgentStore.getState().fetchIdentity();
       } catch (error) {
         if (error instanceof GatewayError) {
           set({ error });
@@ -92,6 +96,11 @@ export const useGatewayStore = create<GatewayStore>((set, get) => {
         connectionState: 'disconnected',
         reconnectAttempt: 0,
         reconnectDelay: 0,
+      });
+
+      // Agent identity tozalash
+      import('@/stores/agent-store').then(({ useAgentStore }) => {
+        useAgentStore.getState().reset();
       });
     },
 

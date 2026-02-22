@@ -106,3 +106,10 @@ export interface DeviceIdentity {
   id: string; // SHA-256 fingerprint of publicKey
   publicKey: string; // Base64 encoded Ed25519 public key
 }
+
+// === AGENT IDENTITY ===
+
+export interface AgentIdentity {
+  name: string;
+  avatar: string; // emoji, masalan "🤖"
+}

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
 import { useGatewayConnection, useIsConnected } from '@/hooks/useGateway';
+import { useAgentName } from '@/hooks/useAgentIdentity';
 import { useTheme } from '@/theme';
 
 interface ChatHeaderProps {
@@ -16,6 +17,7 @@ export function ChatHeader({ onMenuPress }: ChatHeaderProps) {
   const insets = useSafeAreaInsets();
   const { state } = useGatewayConnection();
   const isConnected = useIsConnected();
+  const agentName = useAgentName();
 
   const statusColor = isConnected
     ? colors.statusConnected
@@ -43,7 +45,7 @@ export function ChatHeader({ onMenuPress }: ChatHeaderProps) {
       <AssistantAvatar size={40} />
 
       <View style={styles.info}>
-        <Text style={[styles.name, { color: colors.text }]}>Molty</Text>
+        <Text style={[styles.name, { color: colors.text }]}>{agentName}</Text>
         <View style={styles.statusRow}>
           <View
             style={[styles.statusDot, { backgroundColor: statusColor }]}

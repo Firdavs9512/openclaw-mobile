@@ -1,14 +1,16 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { useAgentAvatar } from '@/hooks/useAgentIdentity';
 
 interface AssistantAvatarProps {
   size?: number;
 }
 
 export function AssistantAvatar({ size = 20 }: AssistantAvatarProps) {
+  const avatar = useAgentAvatar();
   const half = size / 2;
-  const iconSize = Math.round(size * 0.55);
+  const emojiSize = Math.round(size * 0.55);
 
   return (
     <View
@@ -17,7 +19,9 @@ export function AssistantAvatar({ size = 20 }: AssistantAvatarProps) {
         { width: size, height: size, borderRadius: half },
       ]}
     >
-      <FontAwesome name="reddit-alien" size={iconSize} color="#FFFFFF" />
+      <Text style={{ fontSize: emojiSize, lineHeight: size }}>
+        {avatar}
+      </Text>
     </View>
   );
 }
