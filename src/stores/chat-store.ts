@@ -7,18 +7,20 @@ import type {
   StreamingMessage,
   ThinkingLevel,
 } from '@/types/chat';
-import type {
-  AgentContentBlockDelta,
-  AgentContentBlockStart,
-  AgentError,
-  AgentEvent,
-  AgentMessageStart,
-  AgentThinkingDelta,
-  AgentToolUseStart,
-} from '@/types/events';
 import { generateUUID } from '@/gateway/utils';
 import { getGatewayClient } from '@/stores/gateway-store';
 import { AppKeys, appGet, appSet } from '@/utils/app-storage';
+
+// === Gateway Event Types (haqiqiy gateway protokol formati) ===
+
+interface GatewayAgentEvent {
+  runId: string;
+  stream: 'lifecycle' | 'assistant' | 'thinking' | 'tool';
+  data: Record<string, unknown>;
+  sessionKey: string;
+  seq: number;
+  ts: number;
+}
 
 interface ChatStore {
   // === STATE ===
@@ -26,6 +28,7 @@ interface ChatStore {
   activeSessionKey: string | null;
   messages: Record<string, Message[]>;
   streamingMessage: StreamingMessage | null;
+  streamingSessionKey: string | null;
   isAgentRunning: boolean;
   currentRunId: string | null;
 
@@ -41,10 +44,21 @@ interface ChatStore {
   abortRun: () => Promise<void>;
 
   // === STREAMING (ichki) ===
-  _handleAgentEvent: (event: AgentEvent) => void;
-  _appendStreamDelta: (text: string) => void;
-  _appendThinkingDelta: (text: string) => void;
+  _handleAgentEvent: (event: GatewayAgentEvent) => void;
+  _handleChatEvent: (event: GatewayChatEvent) => void;
   _finalizeStream: () => void;
+}
+
+interface GatewayChatEvent {
+  runId: string;
+  sessionKey: string;
+  seq: number;
+  state: 'delta' | 'final';
+  message: {
+    role: 'assistant';
+    content: { type: string; text?: string }[];
+    timestamp?: number;
+  };
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -53,6 +67,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   activeSessionKey: null,
   messages: {},
   streamingMessage: null,
+  streamingSessionKey: null,
   isAgentRunning: false,
   currentRunId: null,
 
@@ -154,6 +169,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set((state) => ({
         isAgentRunning: true,
         currentRunId: result.runId,
+        streamingSessionKey: sessionKey,
         messages: {
           ...state.messages,
           [sessionKey]: (state.messages[sessionKey] || []).map((m) =>
@@ -161,6 +177,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           ),
         },
       }));
+
+      // Safety timeout: agar 60s ichida javob tugamasa, state ni reset qilish
+      const runId = result.runId;
+      setTimeout(() => {
+        const state = get();
+        if (state.isAgentRunning && state.currentRunId === runId) {
+          console.warn('[ChatStore] Agent run timed out, resetting state');
+          set({
+            isAgentRunning: false,
+            streamingMessage: null,
+            currentRunId: null,
+            streamingSessionKey: null,
+          });
+        }
+      }, 60000);
     } catch {
       set((state) => ({
         messages: {
@@ -198,167 +229,178 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         runId: currentRunId,
       });
     } finally {
-      set({ isAgentRunning: false, streamingMessage: null, currentRunId: null });
+      set({ isAgentRunning: false, streamingMessage: null, currentRunId: null, streamingSessionKey: null });
     }
   },
 
-  // === STREAMING (ichki) ===
+  // === STREAMING — agent event handler ===
+  // Ikkala formatni qo'llab-quvvatlaydi:
+  // 1. Haqiqiy gateway: { stream: "lifecycle"|"assistant", data: { delta: "..." } }
+  // 2. Mock/Anthropic: { type: "message_start"|"content_block_delta"|"message_stop" }
 
   _handleAgentEvent: (event) => {
-    switch (event.type) {
-      case 'message_start': {
-        const msgStart = event as AgentMessageStart;
-        set({
-          streamingMessage: {
-            id: generateUUID(),
-            role: 'assistant',
-            content: '',
-            isStreaming: true,
-          },
-          isAgentRunning: true,
-          ...(msgStart.runId ? { currentRunId: msgStart.runId } : {}),
-        });
-        break;
-      }
+    // Formatni aniqlash: haqiqiy gateway "stream" fieldiga ega
+    if (event.stream) {
+      // === Haqiqiy gateway formati ===
+      const { stream, data, runId } = event;
 
-      case 'content_block_start': {
-        const blockStart = event as AgentContentBlockStart;
-        if (blockStart.content_block.type === 'thinking') {
+      if (stream === 'lifecycle') {
+        const phase = data.phase as string;
+
+        if (phase === 'start') {
           set((state) => ({
-            streamingMessage: state.streamingMessage
-              ? { ...state.streamingMessage, isThinking: true }
-              : null,
+            streamingMessage: {
+              id: generateUUID(),
+              role: 'assistant',
+              content: '',
+              isStreaming: true,
+            },
+            isAgentRunning: true,
+            currentRunId: runId,
+            streamingSessionKey: state.streamingSessionKey || state.activeSessionKey,
           }));
-        } else if (blockStart.content_block.type === 'tool_use') {
+        } else if (phase === 'end') {
+          get()._finalizeStream();
+        }
+      } else if (stream === 'assistant') {
+        const delta = data.delta as string | undefined;
+        if (delta) {
+          set((state) => {
+            const current = state.streamingMessage || {
+              id: generateUUID(),
+              role: 'assistant' as const,
+              content: '',
+              isStreaming: true,
+            };
+            return {
+              streamingMessage: {
+                ...current,
+                content: current.content + delta,
+              },
+              isAgentRunning: true,
+            };
+          });
+        }
+      } else if (stream === 'thinking') {
+        const delta = data.delta as string | undefined;
+        if (delta) {
           set((state) => ({
             streamingMessage: state.streamingMessage
               ? {
                   ...state.streamingMessage,
-                  toolName: blockStart.content_block.name,
+                  isThinking: true,
+                  thinkingContent:
+                    (state.streamingMessage.thinkingContent || '') + delta,
                 }
               : null,
           }));
         }
-        break;
-      }
-
-      case 'content_block_delta': {
-        const delta = (event as AgentContentBlockDelta).delta;
-        if (delta.type === 'text_delta' && delta.text) {
-          get()._appendStreamDelta(delta.text);
-        } else if (delta.type === 'thinking_delta' && delta.text) {
-          get()._appendThinkingDelta(delta.text);
+      } else if (stream === 'tool') {
+        const toolName = data.name as string | undefined;
+        if (toolName) {
+          set((state) => ({
+            streamingMessage: state.streamingMessage
+              ? { ...state.streamingMessage, toolName }
+              : null,
+          }));
         }
-        break;
       }
+    } else {
+      // === Mock/Anthropic formati (type-based) ===
+      const legacyEvent = event as unknown as { type: string; runId?: string; delta?: { type: string; text?: string }; error?: { code: string; message: string } };
 
-      case 'content_block_stop': {
-        set((state) => ({
-          streamingMessage: state.streamingMessage
-            ? {
-                ...state.streamingMessage,
-                isThinking: false,
-                toolName: undefined,
-              }
-            : null,
-        }));
-        break;
-      }
-
-      case 'thinking_start': {
-        set((state) => ({
-          streamingMessage: state.streamingMessage
-            ? { ...state.streamingMessage, isThinking: true }
-            : null,
-        }));
-        break;
-      }
-
-      case 'thinking_delta': {
-        const thinkDelta = event as AgentThinkingDelta;
-        if (thinkDelta.delta.text) {
-          get()._appendThinkingDelta(thinkDelta.delta.text);
+      switch (legacyEvent.type) {
+        case 'message_start': {
+          set((state) => ({
+            streamingMessage: {
+              id: generateUUID(),
+              role: 'assistant',
+              content: '',
+              isStreaming: true,
+            },
+            isAgentRunning: true,
+            streamingSessionKey: state.streamingSessionKey || state.activeSessionKey,
+            ...(legacyEvent.runId ? { currentRunId: legacyEvent.runId } : {}),
+          }));
+          break;
         }
-        break;
-      }
-
-      case 'thinking_stop': {
-        set((state) => ({
-          streamingMessage: state.streamingMessage
-            ? { ...state.streamingMessage, isThinking: false }
-            : null,
-        }));
-        break;
-      }
-
-      case 'tool_use_start': {
-        const toolStart = event as AgentToolUseStart;
-        set((state) => ({
-          streamingMessage: state.streamingMessage
-            ? { ...state.streamingMessage, toolName: toolStart.tool.name }
-            : null,
-        }));
-        break;
-      }
-
-      case 'tool_use_stop': {
-        set((state) => ({
-          streamingMessage: state.streamingMessage
-            ? { ...state.streamingMessage, toolName: undefined }
-            : null,
-        }));
-        break;
-      }
-
-      case 'message_delta': {
-        // stop_reason keladi — hozircha handle qilish shart emas
-        break;
-      }
-
-      case 'message_stop': {
-        get()._finalizeStream();
-        break;
-      }
-
-      case 'error': {
-        const errorEvent = event as AgentError;
-        console.warn('[ChatStore] Agent error:', errorEvent.error);
-        set({
-          isAgentRunning: false,
-          streamingMessage: null,
-          currentRunId: null,
-        });
-        break;
+        case 'content_block_delta': {
+          if (legacyEvent.delta?.type === 'text_delta' && legacyEvent.delta.text) {
+            const text = legacyEvent.delta.text;
+            set((state) => ({
+              streamingMessage: state.streamingMessage
+                ? { ...state.streamingMessage, content: state.streamingMessage.content + text }
+                : null,
+            }));
+          }
+          break;
+        }
+        case 'message_stop': {
+          get()._finalizeStream();
+          break;
+        }
+        case 'error': {
+          console.warn('[ChatStore] Agent error:', legacyEvent.error);
+          set({
+            isAgentRunning: false,
+            streamingMessage: null,
+            currentRunId: null,
+            streamingSessionKey: null,
+          });
+          break;
+        }
       }
     }
   },
 
-  _appendStreamDelta: (text) => {
-    set((state) => ({
-      streamingMessage: state.streamingMessage
-        ? {
-            ...state.streamingMessage,
-            content: state.streamingMessage.content + text,
-          }
-        : null,
-    }));
-  },
+  // === STREAMING — chat event handler (to'liq xabar holati) ===
 
-  _appendThinkingDelta: (text) => {
-    set((state) => ({
-      streamingMessage: state.streamingMessage
-        ? {
-            ...state.streamingMessage,
-            thinkingContent:
-              (state.streamingMessage.thinkingContent || '') + text,
-          }
-        : null,
-    }));
+  _handleChatEvent: (event) => {
+    if (event.state === 'final') {
+      // Yakuniy xabar — to'g'ridan to'g'ri messages ga qo'shish
+      const textContent = event.message.content
+        .filter((c) => c.type === 'text' && c.text)
+        .map((c) => c.text)
+        .join('');
+
+      const { streamingSessionKey, activeSessionKey } = get();
+      const sessionKey = streamingSessionKey || activeSessionKey || 'main';
+
+      const finalMsg: Message = {
+        id: generateUUID(),
+        role: 'assistant',
+        content: textContent,
+        timestamp: event.message.timestamp || Date.now(),
+        status: 'complete',
+        sessionKey,
+      };
+
+      set((state) => {
+        // Agar streaming message mavjud bo'lsa va uning ID sidan foydalanish
+        const msgId = state.streamingMessage?.id || finalMsg.id;
+        return {
+          streamingMessage: null,
+          streamingSessionKey: null,
+          isAgentRunning: false,
+          currentRunId: null,
+          messages: {
+            ...state.messages,
+            [sessionKey]: [
+              ...(state.messages[sessionKey] || []),
+              { ...finalMsg, id: msgId },
+            ],
+          },
+        };
+      });
+    }
+    // delta eventlarni agent event orqali handle qilamiz (real-time streaming uchun)
   },
 
   _finalizeStream: () => {
-    const { streamingMessage, activeSessionKey } = get();
-    if (!streamingMessage || !activeSessionKey) return;
+    const { streamingMessage, streamingSessionKey, activeSessionKey } = get();
+    if (!streamingMessage) return;
+
+    const sessionKey = streamingSessionKey || activeSessionKey || 'main';
 
     const finalMsg: Message = {
       id: streamingMessage.id,
@@ -367,17 +409,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       timestamp: Date.now(),
       status: 'complete',
       thinkingContent: streamingMessage.thinkingContent,
-      sessionKey: activeSessionKey,
+      sessionKey,
     };
 
     set((state) => ({
       streamingMessage: null,
+      streamingSessionKey: null,
       isAgentRunning: false,
       currentRunId: null,
       messages: {
         ...state.messages,
-        [activeSessionKey]: [
-          ...(state.messages[activeSessionKey] || []),
+        [sessionKey]: [
+          ...(state.messages[sessionKey] || []),
           finalMsg,
         ],
       },
@@ -385,7 +428,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 }));
 
-// === Agent Event Listener Setup ===
+// === Agent + Chat Event Listener Setup ===
 
 let _agentListenerActive = false;
 
@@ -394,7 +437,24 @@ export function setupAgentEventListener(): void {
   _agentListenerActive = true;
 
   const client = getGatewayClient();
-  client.on('agent', (payload: AgentEvent) => {
-    useChatStore.getState()._handleAgentEvent(payload);
+
+  // Agent eventlar — real-time streaming (lifecycle, assistant, thinking, tool)
+  client.on('agent', (payload: unknown) => {
+    const event = payload as GatewayAgentEvent;
+    useChatStore.getState()._handleAgentEvent(event);
+  });
+
+  // Chat eventlar — yakuniy xabar holati (final fallback)
+  client.on('chat', (payload: unknown) => {
+    const event = payload as GatewayChatEvent;
+    // Faqat final state ni handle qilamiz — agent lifecycle:end bilan race condition
+    // bo'lsa, _handleChatEvent ichida tekshiramiz
+    if (event.state === 'final') {
+      const state = useChatStore.getState();
+      // Agar agent lifecycle:end allaqachon finalize qilgan bo'lsa, skip
+      if (state.isAgentRunning || state.streamingMessage) {
+        useChatStore.getState()._handleChatEvent(event);
+      }
+    }
   });
 }

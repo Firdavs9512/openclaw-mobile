@@ -23,21 +23,27 @@ const STATUS_ICONS: Record<MessageStatus, string> = {
   failed: '\u274C',
 };
 
+// Gateway ichki direktivalarini tozalash (masalan, [[reply_to_current]])
+const GATEWAY_DIRECTIVE_RE = /\[\[[a-z_]+\]\]\s*/gi;
+
 function extractText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
+  let raw: string;
+  if (typeof content === 'string') {
+    raw = content;
+  } else if (Array.isArray(content)) {
+    raw = content
       .map((block) => {
         if (typeof block === 'string') return block;
         if (block && typeof block === 'object' && 'text' in block) return String(block.text);
         return '';
       })
       .join('');
+  } else if (content && typeof content === 'object' && 'text' in content) {
+    raw = String((content as { text: string }).text);
+  } else {
+    raw = String(content ?? '');
   }
-  if (content && typeof content === 'object' && 'text' in content) {
-    return String((content as { text: string }).text);
-  }
-  return String(content ?? '');
+  return raw.replace(GATEWAY_DIRECTIVE_RE, '').trimStart();
 }
 
 export const MessageBubble = React.memo(function MessageBubble({

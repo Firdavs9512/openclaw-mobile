@@ -79,8 +79,8 @@ export default function ChatScreen() {
     async (text: string) => {
       if (!sessionKey || sessionKey === 'new') {
         const newKey = useChatStore.getState().createSession();
-        router.replace(`/chat/${newKey}`);
         await sendMessage(text);
+        router.replace(`/chat/${newKey}`);
       } else {
         await sendMessage(text);
       }

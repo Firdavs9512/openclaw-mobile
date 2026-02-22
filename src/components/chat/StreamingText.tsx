@@ -60,7 +60,7 @@ export const StreamingText = React.memo(function StreamingText({
           <Text
             style={[styles.content, { color: colors.assistantBubbleText }]}
           >
-            {message.content}
+            {message.content.replace(/\[\[[a-z_]+\]\]\s*/gi, '')}
           </Text>
           {message.isStreaming && (
             <Animated.View style={cursorStyle}>
