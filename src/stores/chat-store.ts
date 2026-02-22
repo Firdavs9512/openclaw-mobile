@@ -210,10 +210,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       'chat.history',
       { sessionKey, limit: 50 },
     );
+    const visible = (result.messages || []).filter(
+      (m) => m.role === 'user' || m.role === 'assistant',
+    );
     set((state) => ({
       messages: {
         ...state.messages,
-        [sessionKey]: result.messages || [],
+        [sessionKey]: visible,
       },
     }));
   },
