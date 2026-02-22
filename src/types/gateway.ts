@@ -113,3 +113,13 @@ export interface AgentIdentity {
   name: string;
   avatar: string; // emoji, masalan "🤖"
 }
+
+// === MODEL INFO ===
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow?: number;
+  reasoning?: boolean;
+}

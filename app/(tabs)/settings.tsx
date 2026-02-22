@@ -8,7 +8,9 @@ import { Row } from '@/components/settings/Row';
 import { ProfileCard } from '@/components/settings/ProfileCard';
 import { PillToggle } from '@/components/settings/PillToggle';
 import { ToggleRow } from '@/components/settings/ToggleRow';
+import { ModelPickerSheet } from '@/components/settings/ModelPickerSheet';
 import { useGatewayConnection, useGatewayActions, useIsConnected } from '@/hooks/useGateway';
+import { useSelectedModel } from '@/hooks/useModels';
 import { useTheme, type ThemeMode } from '@/theme';
 import { AppKeys, appGetBoolean, appSet } from '@/utils/app-storage';
 
@@ -111,15 +113,30 @@ function ThemeSection() {
 // === AI Model Section ===
 
 function AIModelSection() {
+  const selectedModel = useSelectedModel();
+  const isConnected = useIsConnected();
+  const [pickerVisible, setPickerVisible] = useState(false);
+
+  const subtitle = !isConnected
+    ? "Gateway'ga ulaning"
+    : selectedModel?.name ?? 'Tanlanmagan';
+
   return (
-    <Section title="AI MODEL">
-      <Row
-        title="Model"
-        subtitle="Claude Sonnet 4.5"
-        chevron
-        isLast
+    <>
+      <Section title="AI MODEL">
+        <Row
+          title="Model"
+          subtitle={subtitle}
+          chevron={isConnected}
+          onPress={isConnected ? () => setPickerVisible(true) : undefined}
+          isLast
+        />
+      </Section>
+      <ModelPickerSheet
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
       />
-    </Section>
+    </>
   );
 }
 

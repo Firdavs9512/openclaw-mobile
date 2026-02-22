@@ -82,6 +82,10 @@ export const useGatewayStore = create<GatewayStore>((set, get) => {
         // Agent identity olish
         const { useAgentStore } = await import('@/stores/agent-store');
         useAgentStore.getState().fetchIdentity();
+
+        // Model ro'yxatini yuklash
+        const { useModelStore } = await import('@/stores/model-store');
+        useModelStore.getState().loadModels();
       } catch (error) {
         if (error instanceof GatewayError) {
           set({ error });
@@ -106,6 +110,11 @@ export const useGatewayStore = create<GatewayStore>((set, get) => {
       // Skills tozalash
       import('@/stores/skills-store').then(({ useSkillsStore }) => {
         useSkillsStore.getState().reset();
+      });
+
+      // Model store tozalash
+      import('@/stores/model-store').then(({ useModelStore }) => {
+        useModelStore.getState().reset();
       });
     },
 

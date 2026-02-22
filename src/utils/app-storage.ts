@@ -15,6 +15,7 @@ export const AppKeys = {
   PERM_FILE_ACCESS: 'perm_file_access',
   PERM_HEARTBEAT: 'perm_heartbeat',
   NOTIFICATIONS_ENABLED: 'notifications_enabled',
+  SELECTED_MODEL: 'selected_model',
 } as const;
 
 export function appSet(key: string, value: string | number | boolean): void {
