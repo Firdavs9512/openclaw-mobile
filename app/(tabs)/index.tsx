@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActionSheetIOS,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +13,7 @@ import { ChatHeader } from '@/components/chat/ChatHeader';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { StreamingText } from '@/components/chat/StreamingText';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatMenuSheet } from '@/components/chat/ChatMenuSheet';
 import { useChat, useMessages, useStreamingMessage } from '@/hooks/useChat';
 import { useIsConnected } from '@/hooks/useGateway';
 import { useChatStore } from '@/stores/chat-store';
@@ -42,6 +41,7 @@ export default function ChatTabScreen() {
   const flatListRef = useRef<FlatList>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_isAtBottom, setIsAtBottom] = useState(true);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   // Sessiyani tiklash yoki yaratish
   useEffect(() => {
@@ -107,38 +107,29 @@ export default function ChatTabScreen() {
     setSessionKey(newKey);
   }, []);
 
+  const handleClearChat = useCallback(() => {
+    if (!sessionKey) return;
+    useChatStore.setState((state) => ({
+      messages: {
+        ...state.messages,
+        [sessionKey]: [],
+      },
+    }));
+  }, [sessionKey]);
+
   const handleMenuPress = useCallback(() => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Bekor qilish', 'Yangi suhbat', 'Suhbatni tozalash'],
-          cancelButtonIndex: 0,
-          destructiveButtonIndex: 2,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            handleNewChat();
-          } else if (buttonIndex === 2) {
-            handleNewChat();
-          }
-        },
-      );
-    } else {
-      Alert.alert(
-        'Menu',
-        undefined,
-        [
-          { text: 'Bekor qilish', style: 'cancel' },
-          { text: 'Yangi suhbat', onPress: handleNewChat },
-          {
-            text: 'Suhbatni tozalash',
-            style: 'destructive',
-            onPress: handleNewChat,
-          },
-        ],
-      );
-    }
+    setMenuVisible(true);
+  }, []);
+
+  const handleMenuNewChat = useCallback(() => {
+    setMenuVisible(false);
+    handleNewChat();
   }, [handleNewChat]);
+
+  const handleMenuClearChat = useCallback(() => {
+    setMenuVisible(false);
+    handleClearChat();
+  }, [handleClearChat]);
 
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -195,6 +186,13 @@ export default function ChatTabScreen() {
         onAbort={abortRun}
         isAgentRunning={isAgentRunning}
         disabled={!isConnected}
+      />
+
+      <ChatMenuSheet
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        onNewChat={handleMenuNewChat}
+        onClearChat={handleMenuClearChat}
       />
     </KeyboardAvoidingView>
   );
