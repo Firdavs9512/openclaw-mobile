@@ -1,75 +1,119 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 
 import { useTheme } from '@/theme';
+import type { SkillStatusEntry } from '@/types/skills';
 
 interface SkillCardProps {
-  name: string;
-  icon: React.ComponentProps<typeof FontAwesome>['name'];
-  description: string;
-  active: boolean;
+  skill: SkillStatusEntry;
+  busy: boolean;
+  onToggle: (skillKey: string, enable: boolean) => void;
+  onPress: (skill: SkillStatusEntry) => void;
 }
 
-export function SkillCard({ name, icon, description, active }: SkillCardProps) {
+function getStatusInfo(skill: SkillStatusEntry) {
+  if (skill.blockedByAllowlist) {
+    return { label: 'BLOKLANGAN', type: 'blocked' as const };
+  }
+  if (
+    skill.missing.bins.length > 0 ||
+    skill.missing.env.length > 0 ||
+    skill.missing.config.length > 0
+  ) {
+    return { label: 'TAYYOR EMAS', type: 'missing' as const };
+  }
+  if (skill.disabled) {
+    return { label: "O'CHIQ", type: 'disabled' as const };
+  }
+  if (skill.eligible && !skill.disabled) {
+    return { label: 'FAOL', type: 'active' as const };
+  }
+  return { label: "O'CHIQ", type: 'disabled' as const };
+}
+
+export function SkillCard({ skill, busy, onToggle, onPress }: SkillCardProps) {
   const { colors } = useTheme();
+  const status = getStatusInfo(skill);
+  const isActive = status.type === 'active';
+
+  const dotColor =
+    status.type === 'active'
+      ? colors.success
+      : status.type === 'blocked'
+        ? colors.error
+        : status.type === 'missing'
+          ? colors.warning
+          : colors.textTertiary;
+
+  const badgeBg =
+    status.type === 'active'
+      ? colors.successLight
+      : status.type === 'blocked'
+        ? colors.errorLight
+        : status.type === 'missing'
+          ? colors.warningLight
+          : colors.surface;
 
   return (
-    <View
-      style={[
+    <Pressable
+      onPress={() => onPress(skill)}
+      style={({ pressed }) => [
         styles.card,
         {
           backgroundColor: colors.skillCardBg,
           borderColor: colors.skillCardBorder,
+          opacity: pressed ? 0.7 : 1,
         },
       ]}
     >
       <View
         style={[styles.iconCircle, { backgroundColor: colors.primaryLight }]}
       >
-        <FontAwesome name={icon} size={20} color={colors.primary} />
+        <Text style={styles.emoji}>{skill.emoji ?? '🧩'}</Text>
       </View>
 
-      <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
+      <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+        {skill.name}
+      </Text>
       <Text
         style={[styles.description, { color: colors.textSecondary }]}
         numberOfLines={2}
       >
-        {description}
+        {skill.description}
       </Text>
 
-      <View
-        style={[
-          styles.badge,
-          {
-            backgroundColor: active
-              ? colors.successLight
-              : colors.surface,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.badgeDot,
-            {
-              backgroundColor: active
-                ? colors.success
-                : colors.textTertiary,
-            },
-          ]}
-        />
-        <Text
-          style={[
-            styles.badgeText,
-            {
-              color: active ? colors.success : colors.textTertiary,
-            },
-          ]}
-        >
-          {active ? 'FAOL' : "O'CHIQ"}
-        </Text>
+      <View style={styles.footer}>
+        <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+          <View style={[styles.badgeDot, { backgroundColor: dotColor }]} />
+          <Text style={[styles.badgeText, { color: dotColor }]}>
+            {status.label}
+          </Text>
+        </View>
+
+        {busy ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          !skill.blockedByAllowlist && (
+            <Switch
+              value={isActive}
+              onValueChange={(value) => onToggle(skill.skillKey, value)}
+              trackColor={{
+                false: colors.switchTrackInactive,
+                true: colors.switchTrackActive,
+              }}
+              style={styles.toggle}
+            />
+          )
+        )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -89,6 +133,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
+  emoji: {
+    fontSize: 22,
+  },
   name: {
     fontSize: 16,
     fontWeight: '700',
@@ -99,8 +146,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginBottom: 12,
   },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   badge: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -117,5 +168,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  toggle: {
+    transform: [{ scale: 0.8 }],
   },
 });

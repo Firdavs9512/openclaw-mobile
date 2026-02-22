@@ -1,101 +1,159 @@
-import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ConnectionBanner } from '@/components/common/ConnectionBanner';
 import { SkillCard } from '@/components/skills/SkillCard';
+import { SkillDetailSheet } from '@/components/skills/SkillDetailSheet';
+import { useIsConnected } from '@/hooks/useGateway';
+import { useSkillActions, useSkills } from '@/hooks/useSkills';
 import { useTheme } from '@/theme';
-
-interface Skill {
-  id: string;
-  name: string;
-  icon: React.ComponentProps<typeof FontAwesome>['name'];
-  description: string;
-  active: boolean;
-}
-
-const SKILLS: Skill[] = [
-  {
-    id: '1',
-    name: 'Gmail',
-    icon: 'envelope',
-    description: 'Email boshqaruvi',
-    active: true,
-  },
-  {
-    id: '2',
-    name: 'Calendar',
-    icon: 'calendar',
-    description: 'Taqvim va rejalar',
-    active: true,
-  },
-  {
-    id: '3',
-    name: 'Browser',
-    icon: 'globe',
-    description: 'Veb sahifalarni ochish',
-    active: true,
-  },
-  {
-    id: '4',
-    name: 'GitHub',
-    icon: 'github',
-    description: 'PR, Issues boshqaruvi',
-    active: false,
-  },
-  {
-    id: '5',
-    name: 'Spotify',
-    icon: 'music',
-    description: 'Musiqa boshqaruvi',
-    active: false,
-  },
-  {
-    id: '6',
-    name: 'Telegram',
-    icon: 'send',
-    description: 'Xabarlar integratsiyasi',
-    active: true,
-  },
-];
+import type { SkillStatusEntry } from '@/types/skills';
 
 export default function SkillsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-
-  const renderItem = ({ item }: { item: Skill }) => (
-    <SkillCard
-      name={item.name}
-      icon={item.icon}
-      description={item.description}
-      active={item.active}
-    />
+  const isConnected = useIsConnected();
+  const { skills, isLoading, error, busyKey } = useSkills();
+  const { loadSkills, toggleSkill } = useSkillActions();
+  const [selectedSkill, setSelectedSkill] = useState<SkillStatusEntry | null>(
+    null,
   );
+
+  useEffect(() => {
+    if (isConnected) {
+      loadSkills(true);
+    }
+  }, [isConnected, loadSkills]);
+
+  const handleRefresh = useCallback(() => {
+    loadSkills(true);
+  }, [loadSkills]);
+
+  const handleToggle = useCallback(
+    (skillKey: string, enable: boolean) => {
+      toggleSkill(skillKey, enable);
+    },
+    [toggleSkill],
+  );
+
+  const handlePress = useCallback((skill: SkillStatusEntry) => {
+    setSelectedSkill(skill);
+  }, []);
+
+  const handleCloseSheet = useCallback(() => {
+    setSelectedSkill(null);
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: SkillStatusEntry }) => (
+      <SkillCard
+        skill={item}
+        busy={busyKey === item.skillKey}
+        onToggle={handleToggle}
+        onPress={handlePress}
+      />
+    ),
+    [busyKey, handleToggle, handlePress],
+  );
+
+  const keyExtractor = useCallback(
+    (item: SkillStatusEntry) => item.skillKey,
+    [],
+  );
+
+  // Loading state — birinchi yuklash
+  const showLoading = isLoading && skills.length === 0;
+  // Error state — skill yo'q va xato bor
+  const showError = !isLoading && !!error && skills.length === 0;
+  // Empty state — hamma narsa yuklandi lekin skill yo'q
+  const showEmpty = !isLoading && !error && skills.length === 0 && isConnected;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={[styles.title, { color: colors.text }]}>Skills</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Faol plaginlar va integratsiyalar
+          {skills.length > 0
+            ? `${skills.length} ta skill topildi`
+            : 'Faol plaginlar va integratsiyalar'}
         </Text>
       </View>
 
-      <FlatList
-        data={SKILLS}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.grid}
-        ListFooterComponent={
+      <ConnectionBanner />
+
+      {showLoading && (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.centerText, { color: colors.textSecondary }]}>
+            Skilllar yuklanmoqda...
+          </Text>
+        </View>
+      )}
+
+      {showError && (
+        <View style={styles.center}>
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {error}
+          </Text>
           <Pressable
-            style={[styles.addButton, { borderColor: colors.border }]}
+            onPress={handleRefresh}
+            style={({ pressed }) => [
+              styles.retryButton,
+              {
+                borderColor: colors.primary,
+                opacity: pressed ? 0.6 : 1,
+              },
+            ]}
           >
-            <Text style={[styles.addButtonText, { color: colors.textSecondary }]}>
-              + Yangi skill qo&apos;shish
+            <Text style={[styles.retryText, { color: colors.primary }]}>
+              Qayta urinish
             </Text>
           </Pressable>
-        }
+        </View>
+      )}
+
+      {showEmpty && (
+        <View style={styles.center}>
+          <Text style={[styles.centerText, { color: colors.textSecondary }]}>
+            Hech qanday skill topilmadi
+          </Text>
+        </View>
+      )}
+
+      {!showLoading && !showError && !showEmpty && (
+        <FlatList
+          data={skills}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          numColumns={2}
+          contentContainerStyle={styles.grid}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading && skills.length > 0}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          removeClippedSubviews
+          maxToRenderPerBatch={10}
+          windowSize={5}
+        />
+      )}
+
+      <SkillDetailSheet
+        skill={selectedSkill}
+        busyKey={busyKey}
+        onClose={handleCloseSheet}
       />
     </View>
   );
@@ -121,17 +179,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingBottom: 24,
   },
-  addButton: {
-    marginHorizontal: 6,
-    marginTop: 12,
-    paddingVertical: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: 'dashed',
+  center: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
   },
-  addButtonText: {
+  centerText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  retryButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: {
     fontSize: 14,
     fontWeight: '600',
   },

@@ -102,6 +102,11 @@ export const useGatewayStore = create<GatewayStore>((set, get) => {
       import('@/stores/agent-store').then(({ useAgentStore }) => {
         useAgentStore.getState().reset();
       });
+
+      // Skills tozalash
+      import('@/stores/skills-store').then(({ useSkillsStore }) => {
+        useSkillsStore.getState().reset();
+      });
     },
 
     reconnectFromSaved: async () => {
