@@ -55,14 +55,6 @@ export function ChatInput({
           },
         ]}
       >
-        <Pressable style={styles.attachButton} disabled={disabled}>
-          <FontAwesome
-            name="plus"
-            size={20}
-            color={colors.textTertiary}
-          />
-        </Pressable>
-
         <TextInput
           ref={inputRef}
           style={[styles.textInput, { color: colors.text }]}
@@ -85,14 +77,19 @@ export function ChatInput({
           </Pressable>
         ) : (
           <Pressable
-            style={styles.actionButton}
+            style={[
+              styles.sendButton,
+              {
+                backgroundColor: canSend ? colors.primary : 'transparent',
+              },
+            ]}
             onPress={handleSend}
             disabled={!canSend}
           >
             <FontAwesome
               name="paper-plane"
-              size={20}
-              color={canSend ? colors.primary : colors.textTertiary}
+              size={16}
+              color={canSend ? '#FFFFFF' : colors.textTertiary}
             />
           </Pressable>
         )}
@@ -111,26 +108,27 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     borderRadius: 24,
     borderWidth: 1,
-    paddingHorizontal: 8,
+    paddingLeft: 16,
+    paddingRight: 8,
     paddingVertical: 6,
-  },
-  attachButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   textInput: {
     flex: 1,
     fontSize: 16,
     lineHeight: 22,
     maxHeight: 88,
-    paddingHorizontal: 8,
     paddingVertical: 6,
   },
   actionButton: {
     width: 36,
     height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

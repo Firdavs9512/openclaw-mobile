@@ -1,5 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
 import { useTheme } from '@/theme';
 import type { Message, MessageStatus } from '@/types/chat';
 
@@ -68,11 +70,11 @@ export const MessageBubble = React.memo(function MessageBubble({
         <Text style={[styles.content, { color: textColor }]}>
           {displayText}
         </Text>
-        <View style={styles.meta}>
-          <Text style={[styles.timestamp, { color: colors.textTertiary }]}>
-            {formatTime(message.timestamp)}
-          </Text>
-          {isUser && (
+        {isUser && (
+          <View style={styles.meta}>
+            <Text style={[styles.timestamp, { color: isUser ? 'rgba(255,255,255,0.7)' : colors.textTertiary }]}>
+              {formatTime(message.timestamp)}
+            </Text>
             <Text
               style={[
                 styles.statusIcon,
@@ -80,15 +82,25 @@ export const MessageBubble = React.memo(function MessageBubble({
                   color:
                     message.status === 'failed'
                       ? colors.error
-                      : colors.textTertiary,
+                      : 'rgba(255,255,255,0.7)',
                 },
               ]}
             >
               {STATUS_ICONS[message.status]}
             </Text>
-          )}
-        </View>
+          </View>
+        )}
       </View>
+
+      {!isUser && (
+        <View style={styles.assistantFooter}>
+          <AssistantAvatar size={20} />
+          <Text style={[styles.timestamp, { color: colors.textTertiary }]}>
+            {formatTime(message.timestamp)}
+          </Text>
+        </View>
+      )}
+
       {message.status === 'failed' && (
         <Pressable
           onPress={() => onRetry?.(message)}
@@ -129,6 +141,13 @@ const styles = StyleSheet.create({
   },
   statusIcon: {
     fontSize: 11,
+  },
+  assistantFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    marginLeft: 4,
   },
   retryButton: {
     marginTop: 4,

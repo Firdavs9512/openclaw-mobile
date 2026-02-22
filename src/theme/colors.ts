@@ -6,8 +6,8 @@ export const lightColors = {
   textSecondary: '#757575',
   textTertiary: '#9E9E9E',
   border: '#E0E0E0',
-  primary: '#1976D2',
-  primaryLight: '#E3F2FD',
+  primary: '#E74C3C',
+  primaryLight: '#FDEDEC',
   error: '#D32F2F',
   errorLight: '#FFEBEE',
   warning: '#F57C00',
@@ -16,9 +16,9 @@ export const lightColors = {
   successLight: '#E8F5E9',
 
   // Chat specific
-  userBubble: '#E3F2FD',
-  userBubbleText: '#212121',
-  assistantBubble: '#F5F5F5',
+  userBubble: '#E74C3C',
+  userBubbleText: '#FFFFFF',
+  assistantBubble: '#F2F2F7',
   assistantBubbleText: '#212121',
   inputBar: '#FAFAFA',
   inputBorder: '#E0E0E0',
@@ -31,6 +31,14 @@ export const lightColors = {
   statusConnected: '#4CAF50',
   statusConnecting: '#FF9800',
   statusDisconnected: '#F44336',
+
+  // Skills
+  skillCardBg: '#FFF5F5',
+  skillCardBorder: '#F8D7DA',
+
+  // Settings
+  switchTrackActive: '#E74C3C',
+  switchTrackInactive: '#E0E0E0',
 };
 
 export type ThemeColors = typeof lightColors;
@@ -43,8 +51,8 @@ export const darkColors: ThemeColors = {
   textSecondary: '#9E9E9E',
   textTertiary: '#757575',
   border: '#333355',
-  primary: '#64B5F6',
-  primaryLight: '#1E3A5F',
+  primary: '#E74C3C',
+  primaryLight: '#3D1A1A',
   error: '#EF5350',
   errorLight: '#3D1A1A',
   warning: '#FFB74D',
@@ -52,8 +60,8 @@ export const darkColors: ThemeColors = {
   success: '#66BB6A',
   successLight: '#1A3D1A',
 
-  userBubble: '#1E3A5F',
-  userBubbleText: '#E0E0E0',
+  userBubble: '#C0392B',
+  userBubbleText: '#FFFFFF',
   assistantBubble: '#2A2A3E',
   assistantBubbleText: '#E0E0E0',
   inputBar: '#16162A',
@@ -65,4 +73,10 @@ export const darkColors: ThemeColors = {
   statusConnected: '#66BB6A',
   statusConnecting: '#FFB74D',
   statusDisconnected: '#EF5350',
+
+  skillCardBg: '#2A1F2E',
+  skillCardBorder: '#3D2835',
+
+  switchTrackActive: '#E74C3C',
+  switchTrackInactive: '#444466',
 };

@@ -120,7 +120,6 @@ function RootLayoutNav() {
           name="onboarding"
           options={{ headerShown: false, gestureEnabled: false }}
         />
-        <Stack.Screen name="chat/[sessionKey]" options={{ headerShown: true, title: 'Chat' }} />
       </Stack>
     </NavigationThemeProvider>
   );

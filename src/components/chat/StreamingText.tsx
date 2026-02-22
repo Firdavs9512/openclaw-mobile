@@ -7,6 +7,8 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+
+import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
 import { useTheme } from '@/theme';
 import type { StreamingMessage } from '@/types/chat';
 
@@ -71,6 +73,10 @@ export const StreamingText = React.memo(function StreamingText({
           )}
         </View>
       </View>
+
+      <View style={styles.assistantFooter}>
+        <AssistantAvatar size={20} />
+      </View>
     </View>
   );
 });
@@ -108,5 +114,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '300',
     lineHeight: 22,
+  },
+  assistantFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    marginLeft: 4,
   },
 });

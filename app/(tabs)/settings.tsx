@@ -1,15 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Section } from '@/components/settings/Section';
 import { Row } from '@/components/settings/Row';
-import { SegmentedControl } from '@/components/settings/SegmentedControl';
+import { ProfileCard } from '@/components/settings/ProfileCard';
+import { PillToggle } from '@/components/settings/PillToggle';
+import { ToggleRow } from '@/components/settings/ToggleRow';
 import { useGatewayConnection, useGatewayActions, useIsConnected } from '@/hooks/useGateway';
 import { useTheme, type ThemeMode } from '@/theme';
-import { AppKeys, appGet, appSet } from '@/utils/app-storage';
-import { loadDeviceIdentity } from '@/utils/crypto';
-import type { ThinkingLevel } from '@/types/chat';
+import { AppKeys, appGetBoolean, appSet } from '@/utils/app-storage';
 
 // === Gateway Section ===
 
@@ -68,41 +69,16 @@ function GatewaySection() {
   );
 }
 
-// === Chat Section ===
+// === Theme Section ===
 
-const THINKING_VALUES: ThinkingLevel[] = ['off', 'low', 'medium', 'high'];
-const THINKING_LABELS = ['Off', 'Low', 'Med', 'High'];
+const THEME_VALUES: ThemeMode[] = ['dark', 'light', 'system'];
+const THEME_LABELS = ["Dark", "Light", "System"];
 
-function ChatSection() {
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
-    () => (appGet(AppKeys.THINKING_LEVEL) as ThinkingLevel) || 'off',
-  );
+function ThemeSection() {
+  const { mode, setMode, isDark } = useTheme();
+  const { colors } = useTheme();
 
-  const handleChange = useCallback((index: number) => {
-    const level = THINKING_VALUES[index];
-    setThinkingLevel(level);
-    appSet(AppKeys.THINKING_LEVEL, level);
-  }, []);
-
-  return (
-    <Section title="CHAT">
-      <Row title="Fikrlash rejimi" subtitle={thinkingLevel} isLast />
-      <SegmentedControl
-        values={THINKING_LABELS}
-        selectedIndex={THINKING_VALUES.indexOf(thinkingLevel)}
-        onChange={handleChange}
-      />
-    </Section>
-  );
-}
-
-// === Appearance Section ===
-
-const THEME_VALUES: ThemeMode[] = ['system', 'light', 'dark'];
-const THEME_LABELS = ['Tizim', 'Yorqin', "Qo'ng'ir"];
-
-function AppearanceSection() {
-  const { mode, setMode } = useTheme();
+  const currentLabel = isDark ? "Qo'ng'ir rejim" : "Yorug' rejim";
 
   const handleChange = useCallback(
     (index: number) => {
@@ -112,35 +88,114 @@ function AppearanceSection() {
   );
 
   return (
-    <Section title="KO'RINISH">
-      <Row title="Mavzu" isLast />
-      <SegmentedControl
-        values={THEME_LABELS}
-        selectedIndex={THEME_VALUES.indexOf(mode)}
-        onChange={handleChange}
+    <Section title="TEMA">
+      <View style={styles.themeRow}>
+        <View style={styles.themeInfo}>
+          <Text style={[styles.themeTitle, { color: colors.text }]}>
+            Ko&apos;rinish
+          </Text>
+          <Text style={[styles.themeSubtitle, { color: colors.textSecondary }]}>
+            {currentLabel}
+          </Text>
+        </View>
+        <PillToggle
+          options={THEME_LABELS}
+          selectedIndex={THEME_VALUES.indexOf(mode)}
+          onChange={handleChange}
+        />
+      </View>
+    </Section>
+  );
+}
+
+// === AI Model Section ===
+
+function AIModelSection() {
+  return (
+    <Section title="AI MODEL">
+      <Row
+        title="Model"
+        subtitle="Claude Sonnet 4.5"
+        chevron
+        isLast
       />
     </Section>
   );
 }
 
-// === About Section ===
+// === Permissions Section ===
 
-function AboutSection() {
-  const [deviceId, setDeviceId] = useState<string | null>(null);
+function PermissionsSection() {
+  const [browserControl, setBrowserControl] = useState(
+    () => appGetBoolean(AppKeys.PERM_BROWSER_CONTROL) ?? true,
+  );
+  const [fileAccess, setFileAccess] = useState(
+    () => appGetBoolean(AppKeys.PERM_FILE_ACCESS) ?? false,
+  );
+  const [heartbeat, setHeartbeat] = useState(
+    () => appGetBoolean(AppKeys.PERM_HEARTBEAT) ?? true,
+  );
 
-  useEffect(() => {
-    loadDeviceIdentity().then((identity) => {
-      if (identity) {
-        setDeviceId(identity.id.slice(0, 16) + '...');
-      }
-    });
+  const handleBrowserControl = useCallback((val: boolean) => {
+    setBrowserControl(val);
+    appSet(AppKeys.PERM_BROWSER_CONTROL, val);
+  }, []);
+
+  const handleFileAccess = useCallback((val: boolean) => {
+    setFileAccess(val);
+    appSet(AppKeys.PERM_FILE_ACCESS, val);
+  }, []);
+
+  const handleHeartbeat = useCallback((val: boolean) => {
+    setHeartbeat(val);
+    appSet(AppKeys.PERM_HEARTBEAT, val);
   }, []);
 
   return (
-    <Section title="HAQIDA">
-      <Row title="Ilova versiyasi" subtitle="0.1.0" />
-      <Row title="Gateway versiyasi" subtitle="—" />
-      <Row title="Device ID" subtitle={deviceId || '—'} isLast />
+    <Section title="RUXSATLAR">
+      <ToggleRow
+        title="Browser Control"
+        subtitle="Veb sahifalarni boshqarish"
+        value={browserControl}
+        onValueChange={handleBrowserControl}
+      />
+      <ToggleRow
+        title="File Access"
+        subtitle="Fayllarni o'qish/yozish"
+        value={fileAccess}
+        onValueChange={handleFileAccess}
+      />
+      <ToggleRow
+        title="Heartbeat"
+        subtitle="Proaktiv tekshiruvlar"
+        value={heartbeat}
+        onValueChange={handleHeartbeat}
+        isLast
+      />
+    </Section>
+  );
+}
+
+// === App Section ===
+
+function AppSection() {
+  const [notifications, setNotifications] = useState(
+    () => appGetBoolean(AppKeys.NOTIFICATIONS_ENABLED) ?? true,
+  );
+
+  const handleNotifications = useCallback((val: boolean) => {
+    setNotifications(val);
+    appSet(AppKeys.NOTIFICATIONS_ENABLED, val);
+  }, []);
+
+  return (
+    <Section title="ILOVA">
+      <ToggleRow
+        title="Bildirishnomalar"
+        value={notifications}
+        onValueChange={handleNotifications}
+        isLast
+      />
     </Section>
   );
 }
@@ -149,16 +204,28 @@ function AboutSection() {
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
     >
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Sozlamalar
+        </Text>
+        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+          OpenClaw konfiguratsiyasi
+        </Text>
+      </View>
+
+      <ProfileCard />
+      <ThemeSection />
+      <AIModelSection />
+      <PermissionsSection />
+      <AppSection />
       <GatewaySection />
-      <ChatSection />
-      <AppearanceSection />
-      <AboutSection />
     </ScrollView>
   );
 }
@@ -168,7 +235,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingTop: 16,
     paddingBottom: 40,
+  },
+  header: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  themeInfo: {
+    flex: 1,
+  },
+  themeTitle: {
+    fontSize: 16,
+  },
+  themeSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
 });

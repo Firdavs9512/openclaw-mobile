@@ -1,223 +1,222 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   Alert,
   FlatList,
-  Pressable,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
-  View,
 } from 'react-native';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
-import { Text } from '@/components/common/Themed';
+import { Text, View } from '@/components/common/Themed';
 import { ConnectionBanner } from '@/components/common/ConnectionBanner';
-import { SessionListItem } from '@/components/chat/SessionListItem';
-import { useSessions } from '@/hooks/useChat';
+import { ChatHeader } from '@/components/chat/ChatHeader';
+import { MessageBubble } from '@/components/chat/MessageBubble';
+import { StreamingText } from '@/components/chat/StreamingText';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { useChat, useMessages, useStreamingMessage } from '@/hooks/useChat';
 import { useIsConnected } from '@/hooks/useGateway';
 import { useChatStore } from '@/stores/chat-store';
 import { useTheme } from '@/theme';
-import type { SessionInfo } from '@/types/chat';
+import { AppKeys, appGet } from '@/utils/app-storage';
+import type { Message } from '@/types/chat';
 
-// ─── Empty State ────────────────────────────────────────────
-
-function EmptySessionsState() {
+function EmptyState() {
   const { colors } = useTheme();
 
   return (
     <View style={styles.emptyContainer}>
-      <FontAwesome name="comment-o" size={48} color={colors.textTertiary} />
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Suhbatlar yo&apos;q
-      </Text>
+      <Text style={styles.emptyTitle}>OpenClaw ga xush kelibsiz!</Text>
       <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-        Yangi suhbat boshlash uchun pastdagi + tugmasini bosing.
+        Birinchi xabaringizni yozing
       </Text>
     </View>
   );
 }
 
-// ─── FAB ────────────────────────────────────────────────────
-
-function FAB({
-  onPress,
-  disabled,
-}: {
-  onPress: () => void;
-  disabled: boolean;
-}) {
+export default function ChatTabScreen() {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const scale = useSharedValue(0);
-
-  useEffect(() => {
-    scale.value = withSpring(1, { damping: 12 });
-  }, [scale]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        styles.fab,
-        { bottom: insets.bottom + 20, backgroundColor: colors.primary },
-        disabled && styles.fabDisabled,
-        animatedStyle,
-      ]}
-    >
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.fabPressable,
-          pressed && styles.fabPressed,
-        ]}
-      >
-        <FontAwesome name="plus" size={24} color="#FFFFFF" />
-      </Pressable>
-    </Animated.View>
-  );
-}
-
-// ─── Sessions Screen ────────────────────────────────────────
-
-export default function SessionsScreen() {
-  const sessions = useSessions();
   const isConnected = useIsConnected();
-  const { colors } = useTheme();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const flatListRef = useRef<FlatList>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isAtBottom, setIsAtBottom] = useState(true);
 
+  // Sessiyani tiklash yoki yaratish
   useEffect(() => {
-    if (isConnected) {
-      useChatStore.getState().loadSessions();
-    }
-  }, [isConnected]);
-
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await useChatStore.getState().loadSessions();
-    } finally {
-      setIsRefreshing(false);
+    const lastKey = appGet(AppKeys.LAST_SESSION_KEY);
+    if (lastKey) {
+      setSessionKey(lastKey);
+      useChatStore.getState().setActiveSession(lastKey);
+    } else {
+      const newKey = useChatStore.getState().createSession();
+      setSessionKey(newKey);
     }
   }, []);
 
-  const handleNewSession = useCallback(() => {
-    const sessionKey = useChatStore.getState().createSession();
-    router.push(`/chat/${sessionKey}`);
-  }, []);
+  // History yuklash
+  useEffect(() => {
+    if (sessionKey && isConnected) {
+      useChatStore.getState().loadHistory(sessionKey);
+    }
+  }, [sessionKey, isConnected]);
 
-  const handleDelete = useCallback((sessionKey: string) => {
-    Alert.alert(
-      "Suhbatni o'chirish",
-      "Bu suhbat butunlay o'chiriladi. Davom etilsinmi?",
-      [
-        { text: 'Bekor qilish', style: 'cancel' },
-        {
-          text: "O'chirish",
-          style: 'destructive',
-          onPress: async () => {
-            await useChatStore.getState().deleteSession(sessionKey);
-          },
-        },
-      ],
-    );
-  }, []);
+  const messages = useMessages(sessionKey ?? '');
+  const streamingMessage = useStreamingMessage();
+  const { sendMessage, abortRun, isAgentRunning } = useChat();
 
-  const renderItem = useCallback(
-    ({ item }: { item: SessionInfo }) => (
-      <SessionListItem
-        session={item}
-        onPress={() => router.push(`/chat/${item.sessionKey}`)}
-        onDelete={() => handleDelete(item.sessionKey)}
-      />
-    ),
-    [handleDelete],
+  const allMessages = useMemo(() => {
+    const msgs = [...messages];
+
+    if (streamingMessage && streamingMessage.isStreaming) {
+      msgs.push({
+        id: streamingMessage.id,
+        role: 'assistant',
+        content: streamingMessage.content,
+        timestamp: Date.now(),
+        status: 'streaming',
+        sessionKey: sessionKey ?? '',
+      });
+    }
+
+    return msgs.reverse();
+  }, [messages, streamingMessage, sessionKey]);
+
+  const handleSend = useCallback(
+    async (text: string) => {
+      if (!sessionKey) return;
+      await sendMessage(text);
+    },
+    [sessionKey, sendMessage],
   );
 
-  const keyExtractor = useCallback(
-    (item: SessionInfo) => item.sessionKey,
+  const handleRetry = useCallback(
+    (message: Message) => {
+      sendMessage(message.content);
+    },
+    [sendMessage],
+  );
+
+  const handleNewChat = useCallback(() => {
+    const newKey = useChatStore.getState().createSession();
+    setSessionKey(newKey);
+  }, []);
+
+  const handleMenuPress = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Bekor qilish', 'Yangi suhbat', 'Suhbatni tozalash'],
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: 2,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            handleNewChat();
+          } else if (buttonIndex === 2) {
+            handleNewChat();
+          }
+        },
+      );
+    } else {
+      Alert.alert(
+        'Menu',
+        undefined,
+        [
+          { text: 'Bekor qilish', style: 'cancel' },
+          { text: 'Yangi suhbat', onPress: handleNewChat },
+          {
+            text: 'Suhbatni tozalash',
+            style: 'destructive',
+            onPress: handleNewChat,
+          },
+        ],
+      );
+    }
+  }, [handleNewChat]);
+
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset } = event.nativeEvent;
+      setIsAtBottom(contentOffset.y < 50);
+    },
     [],
   );
 
+  const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: Message }) => {
+      if (item.status === 'streaming' && streamingMessage) {
+        return <StreamingText message={streamingMessage} />;
+      }
+      return <MessageBubble message={item} onRetry={handleRetry} />;
+    },
+    [streamingMessage, handleRetry],
+  );
+
+  const showEmpty = allMessages.length === 0;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+    >
+      <ChatHeader onMenuPress={handleMenuPress} />
       <ConnectionBanner />
 
-      <FlatList
-        data={sessions}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        refreshing={isRefreshing}
-        onRefresh={isConnected ? handleRefresh : undefined}
-        ListEmptyComponent={<EmptySessionsState />}
-        contentContainerStyle={
-          sessions.length === 0 ? styles.emptyList : undefined
-        }
-      />
+      {showEmpty ? (
+        <EmptyState />
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={allMessages}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          inverted
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          removeClippedSubviews
+          maxToRenderPerBatch={15}
+          windowSize={10}
+          initialNumToRender={20}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
 
-      <FAB onPress={handleNewSession} disabled={!isConnected} />
-    </View>
+      <ChatInput
+        onSend={handleSend}
+        onAbort={abortRun}
+        isAgentRunning={isAgentRunning}
+        disabled={!isConnected}
+      />
+    </KeyboardAvoidingView>
   );
 }
-
-// ─── Styles ─────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  emptyList: {
-    flex: 1,
+  listContent: {
+    paddingVertical: 8,
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 16,
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  fabDisabled: {
-    opacity: 0.5,
-  },
-  fabPressable: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabPressed: {
-    opacity: 0.8,
   },
 });

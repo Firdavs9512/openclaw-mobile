@@ -11,6 +11,10 @@ export const AppKeys = {
   THEME: 'theme',
   ONBOARDING_COMPLETE: 'onboarding_complete',
   DISCOVERED_GATEWAYS: 'discovered_gateways',
+  PERM_BROWSER_CONTROL: 'perm_browser_control',
+  PERM_FILE_ACCESS: 'perm_file_access',
+  PERM_HEARTBEAT: 'perm_heartbeat',
+  NOTIFICATIONS_ENABLED: 'notifications_enabled',
 } as const;
 
 export function appSet(key: string, value: string | number | boolean): void {
