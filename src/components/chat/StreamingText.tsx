@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
+import { MarkdownContent } from '@/components/chat/MarkdownContent';
 import { useTheme } from '@/theme';
 import type { StreamingMessage } from '@/types/chat';
 
@@ -59,13 +60,11 @@ export const StreamingText = React.memo(function StreamingText({
           </View>
         )}
         <View style={styles.contentRow}>
-          <Text
-            style={[styles.content, { color: colors.assistantBubbleText }]}
-          >
-            {message.content.replace(/\[\[[a-z_]+\]\]\s*/gi, '')}
-          </Text>
+          <MarkdownContent
+            content={message.content.replace(/\[\[[a-z_]+\]\]\s*/gi, '')}
+          />
           {message.isStreaming && (
-            <Animated.View style={cursorStyle}>
+            <Animated.View style={[cursorStyle, styles.cursorWrapper]}>
               <Text style={[styles.cursor, { color: colors.primary }]}>
                 |
               </Text>
@@ -102,13 +101,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   contentRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
+    flexDirection: 'column',
   },
-  content: {
-    fontSize: 16,
-    lineHeight: 22,
+  cursorWrapper: {
+    alignSelf: 'flex-end',
   },
   cursor: {
     fontSize: 18,
