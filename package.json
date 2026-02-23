@@ -47,6 +47,7 @@
     "react-native": "0.81.5",
     "react-native-get-random-values": "^2.0.0",
     "react-native-keychain": "^10.0.0",
+    "react-native-markdown-display": "^7.0.2",
     "react-native-mmkv": "^4.1.2",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
@@ -59,6 +60,7 @@
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.94",
     "@types/jest": "^30.0.0",
+    "@types/markdown-it": "^14.1.2",
     "@types/react": "~19.1.0",
     "@types/ws": "^8.18.1",
     "eslint": "^9.0.0",

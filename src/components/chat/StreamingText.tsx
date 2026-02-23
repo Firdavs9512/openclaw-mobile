@@ -9,12 +9,16 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
+import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { useTheme } from '@/theme';
 import type { StreamingMessage } from '@/types/chat';
 
 interface StreamingTextProps {
   message: StreamingMessage;
 }
+
+// Gateway ichki direktivalarini tozalash
+const GATEWAY_DIRECTIVE_RE = /\[\[[a-z_]+\]\]\s*/gi;
 
 export const StreamingText = React.memo(function StreamingText({
   message,
@@ -38,6 +42,9 @@ export const StreamingText = React.memo(function StreamingText({
     opacity: cursorOpacity.value,
   }));
 
+  const cleanContent = message.content.replace(GATEWAY_DIRECTIVE_RE, '');
+  const hasContent = cleanContent.length > 0;
+
   return (
     <View
       style={[
@@ -58,20 +65,16 @@ export const StreamingText = React.memo(function StreamingText({
             </Text>
           </View>
         )}
-        <View style={styles.contentRow}>
-          <Text
-            style={[styles.content, { color: colors.assistantBubbleText }]}
-          >
-            {message.content.replace(/\[\[[a-z_]+\]\]\s*/gi, '')}
-          </Text>
-          {message.isStreaming && (
-            <Animated.View style={cursorStyle}>
-              <Text style={[styles.cursor, { color: colors.primary }]}>
-                |
-              </Text>
-            </Animated.View>
-          )}
-        </View>
+        {hasContent && (
+          <MarkdownRenderer>{cleanContent}</MarkdownRenderer>
+        )}
+        {message.isStreaming && (
+          <Animated.View style={[styles.cursorContainer, cursorStyle]}>
+            <Text style={[styles.cursor, { color: colors.primary }]}>
+              ▍
+            </Text>
+          </Animated.View>
+        )}
       </View>
 
       <View style={styles.assistantFooter}>
@@ -101,14 +104,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: 'italic',
   },
-  contentRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-  },
-  content: {
-    fontSize: 16,
-    lineHeight: 22,
+  cursorContainer: {
+    height: 22,
+    justifyContent: 'center',
   },
   cursor: {
     fontSize: 18,
