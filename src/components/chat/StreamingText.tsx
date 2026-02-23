@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -9,8 +9,12 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
+import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { useTheme } from '@/theme';
 import type { StreamingMessage } from '@/types/chat';
+
+// Gateway ichki direktivalarini tozalash
+const GATEWAY_DIRECTIVE_RE = /\[\[[a-z_]+\]\]\s*/gi;
 
 interface StreamingTextProps {
   message: StreamingMessage;
@@ -38,6 +42,11 @@ export const StreamingText = React.memo(function StreamingText({
     opacity: cursorOpacity.value,
   }));
 
+  const cleanedContent = useMemo(
+    () => message.content.replace(GATEWAY_DIRECTIVE_RE, ''),
+    [message.content],
+  );
+
   return (
     <View
       style={[
@@ -59,13 +68,12 @@ export const StreamingText = React.memo(function StreamingText({
           </View>
         )}
         <View style={styles.contentRow}>
-          <Text
-            style={[styles.content, { color: colors.assistantBubbleText }]}
-          >
-            {message.content.replace(/\[\[[a-z_]+\]\]\s*/gi, '')}
-          </Text>
+          <MarkdownRenderer
+            content={cleanedContent}
+            isStreaming={message.isStreaming}
+          />
           {message.isStreaming && (
-            <Animated.View style={cursorStyle}>
+            <Animated.View style={[styles.cursorContainer, cursorStyle]}>
               <Text style={[styles.cursor, { color: colors.primary }]}>
                 |
               </Text>
@@ -106,9 +114,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'flex-end',
   },
-  content: {
-    fontSize: 16,
-    lineHeight: 22,
+  cursorContainer: {
+    justifyContent: 'flex-end',
   },
   cursor: {
     fontSize: 18,
