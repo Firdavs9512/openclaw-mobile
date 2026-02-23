@@ -19,7 +19,7 @@ import { useIsConnected } from '@/hooks/useGateway';
 import { useChatStore } from '@/stores/chat-store';
 import { useTheme } from '@/theme';
 import { AppKeys, appGet } from '@/utils/app-storage';
-import type { Message } from '@/types/chat';
+import type { Attachment, Message } from '@/types/chat';
 
 function EmptyState() {
   const { colors } = useTheme();
@@ -88,16 +88,16 @@ export default function ChatTabScreen() {
   }, [messages, streamingMessage, sessionKey]);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, attachments?: Attachment[]) => {
       if (!sessionKey) return;
-      await sendMessage(text);
+      await sendMessage(text, attachments);
     },
     [sessionKey, sendMessage],
   );
 
   const handleRetry = useCallback(
     (message: Message) => {
-      sendMessage(message.content);
+      sendMessage(message.content, message.attachments);
     },
     [sendMessage],
   );

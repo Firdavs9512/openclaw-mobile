@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
+import { AttachmentThumbnails } from '@/components/chat/AttachmentThumbnails';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { useTheme } from '@/theme';
 import type { Message, MessageStatus } from '@/types/chat';
@@ -68,10 +69,15 @@ export const MessageBubble = React.memo(function MessageBubble({
       ]}
     >
       <View style={[styles.bubble, { backgroundColor: bubbleBg }]}>
+        {message.attachments && message.attachments.length > 0 && (
+          <AttachmentThumbnails attachments={message.attachments} isUser={isUser} />
+        )}
         {isUser ? (
-          <Text style={[styles.content, { color: textColor }]}>
-            {displayText}
-          </Text>
+          displayText.length > 0 && (
+            <Text style={[styles.content, { color: textColor }]}>
+              {displayText}
+            </Text>
+          )
         ) : (
           <MarkdownRenderer content={displayText} />
         )}
