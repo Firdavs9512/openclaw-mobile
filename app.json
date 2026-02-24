@@ -18,7 +18,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSBonjourServices": ["_openclaw-gw._tcp"],
-        "NSLocalNetworkUsageDescription": "OpenClaw tarmoqdagi gateway serverlarni topish uchun local tarmoqqa kirish kerak."
+        "NSLocalNetworkUsageDescription": "OpenClaw tarmoqdagi gateway serverlarni topish uchun local tarmoqqa kirish kerak.",
+        "NSPhotoLibraryUsageDescription": "Xabar bilan rasm biriktirish uchun galereya ruxsati kerak."
       }
     },
     "android": {
@@ -32,7 +33,10 @@
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_WIFI_STATE",
-        "android.permission.CHANGE_WIFI_MULTICAST_STATE"
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -47,6 +51,12 @@
         {
           "cameraPermission": "QR kod skanerlash uchun kamera ruxsati kerak.",
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Xabar bilan rasm biriktirish uchun galereya ruxsati kerak."
         }
       ]
     ],

@@ -13,7 +13,7 @@ export interface Message {
 export type MessageStatus = 'sending' | 'sent' | 'streaming' | 'complete' | 'failed';
 
 export interface Attachment {
-  type: 'image' | 'file' | 'audio';
+  type: 'image' | 'document' | 'file' | 'audio';
   mimeType: string;
   fileName: string;
   content: string; // Base64 encoded
